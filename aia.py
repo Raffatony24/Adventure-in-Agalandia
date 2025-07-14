@@ -24,14 +24,14 @@ enemies = {
     "ghost": {
         "hp": 2,
         "damage": 0,
-        "description": "the ghost blocks your path",
+        "description": "an immaterial ghost that cant be touched",
         "attackable": False
     }
 }
 
 items = {
     "sword": {
-        "description": "A bad blade but its all you have.",
+        "description": "an old rusty blade.",
         "type": "weapon",
         "damage": 10
     },
@@ -77,77 +77,120 @@ def create_player():
 def load_map():
     rooms = {
         "0": {
-            "description": "You are in a forest.",
+            "description": "You are in a forest surrounded by trees.",
             "exits": {"north": "1"},
             "items": ["sword", "health potion"],
-            "enemy": None
+            "enemy": None,
+            "details": {
+                "tree": "its just a tree"
+
+
+            }
         },
         "1": {
             "description": "A crossway point between the merchant and the town.",
             "exits": {"east": "2", "north": "3"},
             "items": [],
-            "enemy": None
+            "enemy": None,
+            "details":{
+                "crossway":"A simple crossway it leads to the merchant (east) or the village whom is further north",
+            }
         },
         "2": {
             "description": "The Merchants Adobe! Buy anything you want.",
             "exits": {"west": "0"},
             "items": [],
-            "enemy": None
+            "enemy": None,
+            "details":{
+                "merchant": "A wandering merchant.",
+                
+            }
         },
         "3": {
-            "description": "You can see the entrance of a cave to your east and the lights of the village to your west.",
+            "description": "You can see a cave entrance to your east and the lights of the village to your west.",
             "exits": {"east": "6", "west": "4"},
             "items": [],
-            "enemy": None
+            "enemy": None,
+            "details":{
+                "cave entrance": "exactly what the name suggests",
+                "village ligths":"the ligths of the village whom is to your west",
+                "village": "the village , migth be interesting to go there"
+
+            }
         },
         "4": {
             "description": "You are at the village and see a lot of villagers.",
             "exits": {"east": "3", "south": "5"},
             "items": [],
-            "enemy": None
+            "enemy": None,
+            "details":{
+                "villagers": "They are talking and doing village stuff.",
+            }
         },
         "5": {
-            "description": "You are at the gates of the palace. You'll need a key to enter.",
+            "description": "You are at the palace gates. You'll need a key to enter.",
             "exits": {"north": "4", "south": "11"},
             "items": ["guards shield"],
             "enemy": None,
-            "locked": True
+            "locked": True,
+            "details":{
+                "palace gates": "the gates of the palace , they are locked ",
+                "gates":"the gates of the palace , they are locked "
+            }
         },
         "6": {
-            "description": "You are at the entrance of the cave.",
+            "description": "You are at the cave entrance.",
             "exits": {"west": "3", "east": "7"},
             "items": [],
-            "enemy": None
+            "enemy": None,
+            "details":{
+                "cave entrance":"it is exactly what the name suggests",
+                "cave":"it is exactly what the name suggests"
+            }
         },
         "7": {
-            "description": "You see 2 narrow paths. Which do you take?",
+            "description": "You have entered the cave and immediatly smell the smell of a rotting corpse ,see two paths. Which do you take?",
             "exits": {"north": "8", "south": "9"},
             "items": ["dagger"],
-            "enemy": "goblin"
+            "enemy": "goblin",
+            "details":{
+                "paths":"there are 2 ways you can go north or south",
+                "two paths":"there are 2 ways you can go north or south"
+            }
         },
         "8": {
             "description": "you see a chest full of coins.",
             "exits": {"south": "7"},
             "items": ["gold chest"],
-            "enemy": None
+            "enemy": None,
+            "details":{}
         },
         "9": {
             "description": "Your path is blocked by a ghost. Maybe talk to it.",
             "exits": {"north": "7", "east": "10"},
             "items": [],
-            "enemy": "ghost"
+            "enemy": "ghost",
+            "details":{}
         },
         "10": {
-            "description": "You see a skeleton in armor holding a key.",
+            "description": "You see a skeleton wearing an armor and holding a key.",
             "exits": {"west": "9", "east": "11"},
             "items": ["key"],
-            "enemy": "goblin"
+            "enemy": None,
+            "details":{
+                "skeleton":"this must have been the reason for the smell",
+                "armor":"the armor is too fragile to use , maybe use the shield?"
+            }
         },
         "11": {
             "description": "You are at the throne room and see the king!",
             "exits": {"west": "10"},
             "items": [],
-            "enemy": "king"
+            "enemy": "king",
+            "details":{
+                "throne":"its a throne what did you expect",
+                "throne room":"exactly what the name suggests"
+            }
         }
     }
     return rooms
@@ -158,15 +201,47 @@ def examine_item(player, item_name):
         return
 
     item_name = item_name.lower()
+    room = rooms[player["location"]]
+    inventory_items = player["inventory"]
+    room_items = [i.lower() for i in room.get("items", [])]
+    room_details = room.get("details", {})
+    enemy_name = room.get("enemy")
 
-    if item_name in player["inventory"]:
-        data = items.get(item_name)
-        if data:
-            print(f"{item_name.capitalize()}: {data.get('description', 'No description.')}")
-            return
+    # 1. guarda inventory
+    if item_name in inventory_items:
+        item_data = items.get(item_name)
+        if item_data and "description" in item_data:
+            print(f"{item_name.capitalize()}: {item_data['description']}")
         else:
-            print(f"{item_name.capitalize()} has no known description.")
-            return
+            print(f"{item_name.capitalize()} has no description.")
+        return
+
+    # 2. guarda nei romm items se esiste
+    if item_name in room_items:
+        real_name = room["items"][room_items.index(item_name)]
+        item_data = items.get(real_name)
+        if item_data and "description" in item_data:
+            print(f"{real_name.capitalize()}: {item_data['description']}")
+        else:
+            print(f"{real_name.capitalize()} has no description.")
+        return
+
+    # 3. guarda i room detail
+    if item_name in room_details:
+        print(f"{item_name.capitalize()}: {room_details[item_name]}")
+        return
+
+    # 4. guarda gli enemy
+    if enemy_name and enemy_name.lower() == item_name:
+        enemy_data = enemies.get(enemy_name)
+        if enemy_data and "description" in enemy_data:
+            print(f"{enemy_name.capitalize()}: {enemy_data['description']}")
+        else:
+            print(f"{enemy_name.capitalize()} is here, but there's no description.")
+        return
+
+    # 5. Not found
+    print(f"You don't see a {item_name} here.")
 
     current_room = rooms[player["location"]]
     room_items = [i.lower() for i in current_room["items"]]
@@ -213,7 +288,7 @@ def look_around(player, rooms):
     print("Directions: " + exits)
 
 def handle_look(player, arg):
-    if arg == "" or arg == "around":
+    if not arg or arg == "around":
         look_around(player, rooms)
     else:
         examine_item(player, arg)
