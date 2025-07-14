@@ -152,9 +152,6 @@ def load_map():
     }
     return rooms
 
-my_player = create_player()
-rooms = load_map()
-
 def examine_item(player, item_name):
     if not item_name:
         print("Look at what?")
@@ -450,6 +447,12 @@ def main_game_loop():
         else:
             print("i don't understand that.")
 
+# ###
+# Main
+# ###
 
 if __name__ == "__main__":
+    my_player = create_player()
+    rooms = load_map()
+
     show_menu()
