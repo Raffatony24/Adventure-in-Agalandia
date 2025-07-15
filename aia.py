@@ -59,6 +59,15 @@ items = {
         "description": "Restores 50 HP when used.",
         "type": "healing",
         "heal_amount": 50
+    },
+    "magic robe": {
+        "description": "A shimmering robe imbued with protective magic. Increases your defense.",
+        "type": "armor",
+        "defense": 8,
+    },
+    "pendant":{
+        "description":"an old shiny pendant",
+        "type":"quest"
     }
 }
 
@@ -72,9 +81,11 @@ def create_player():
         "inventory": {},
         "location": "0",
         "current_enemy": None,
+        "defense": 0,
         "flags": {
             "ghost_block": True
-}
+        },
+        "quests": {}
     }
     return player
 
@@ -87,8 +98,6 @@ def load_map():
             "enemy": None,
             "details": {
                 "tree": "its just a tree"
-
-
             }
         },
         "1": {
@@ -109,8 +118,10 @@ def load_map():
                 "merchant": "A wandering merchant.",
             },
             "npcs":{
-                "merchant":"interested in buying something?"
+                "merchant":{
+                    "dialogue":"interested in buying something?"
             }
+        }
         },
         "3": {
             "description": "You can see a cave entrance to your east and the lights of the village to your west.",
@@ -125,7 +136,7 @@ def load_map():
             }
         },
         "4": {
-            "description": "You are at the village and see a villagers and a monk.",
+            "description": "You are at the village you can see a monk some villagers and a mage.",
             "exits": {"east": "3", "south": "5"},
             "items": [],
             "enemy": None,
@@ -133,8 +144,17 @@ def load_map():
                 "villagers": "They are talking and doing village stuff.",
             },
             "npcs":{
-                "villager":"hello there adventurer you look like you come from bertada is that rigth?",
-                "monk":"oh adventurer could you free us from the king alfredus?"
+                "villager":{
+                    "dialogue":"hello there adventurer you look like you come from bertada is that rigth?"
+                },
+                "monk":{
+                    "dialogue":"oh adventurer could you free us from the king alfredus?"
+                },
+                "mage":{
+                    "dialogue":"i can give you a magic robe if you give me the pendant",
+                    "quest_given":True,
+                    "quest_completed":False
+                }
             }
         },
         "5": {
@@ -176,7 +196,7 @@ def load_map():
             "details":{}
         },
         "9": {
-            "description": "Your path is blocked by a ghost. Maybe talk to it.",
+            "description": "you can see a skeleton in the next room.",
             "exits": {"north": "7", "east": "10"},
             "items": [],
             "enemy": "ghost",
@@ -184,7 +204,9 @@ def load_map():
                 "ghost":"the ghost is blocking your path maybe try talking to it"
             },
             "npcs":{
-                "ghost":"ill let you pass if you tell me the name of the king"
+                "ghost":{
+                   "dialogue":"ill let you pass if you tell me the name of the king"
+                }
             },
             "blocked_exits":{
                 "east":{
@@ -194,9 +216,9 @@ def load_map():
             }
         },
         "10": {
-            "description": "You see a skeleton wearing an armor and holding a key.",
+            "description": "You see a skeleton wearing an armor  a pendant and a key.",
             "exits": {"west": "9", "east": "11"},
-            "items": ["key"],
+            "items": ["key", "pendant"],
             "enemy": None,
             "details":{
                 "skeleton":"this must have been the reason for the smell",
@@ -213,10 +235,13 @@ def load_map():
                 "throne room":"exactly what the name suggests"
             },
             "npcs":{
-                "king":"what do you want"
+                "king":{
+                    "dialogue":"what do you want"
             }
         }
     }
+    }
+    
     return rooms
 
 def examine_item(player, item_name):
@@ -310,23 +335,54 @@ def show_help(player, arg=None):
     print("========================")
 
 def talk_to_npc(player, npc_name):
-    room = rooms[player["location"]]
-    npc_dict = room.get("npcs", {})
-
-    if npc_name not in npc_dict:
+    location = player["location"]
+    room = rooms[location]
+    
+    if "npcs" not in room or npc_name not in room["npcs"]:
         print(f"There is no {npc_name} here to talk to.")
         return
 
-    if npc_name == "ghost":
-        print("Ghost: 'I'll let you pass if you tell me the name of the king.'")
-        answer = input("What is the name of the king? ").strip().lower()
-        if answer == "alfredus":  
-            print("Ghost: 'Correct. You may pass.'")
-            player["flags"]["ghost_block"] = False
+    npc = room["npcs"][npc_name]
+
+    if npc_name == "mage":
+        # Quest status for magic robe
+        quest_status = player["quests"].get("magic_robe", None)
+
+        if quest_status is None:
+            print(npc["dialogue"])
+            player["quests"]["magic_robe"] = "pending"
+        elif quest_status == "pending":
+            if "pendant" in player["inventory"]:
+                print("Thank you for bringing the pendant! Here, take this magic robe.")
+                player["inventory"]["magic robe"] = player["inventory"].get("magic robe", 0) + 1
+                player["quests"]["magic_robe"] = "completed"
+                # Remove pendant from inventory
+                player["inventory"]["pendant"] -= 1
+                if player["inventory"]["pendant"] == 0:
+                    del player["inventory"]["pendant"]
+            else:
+                print("You still need to bring me the pendant from the skeleton.")
         else:
-            print("Ghost: 'Wrong. Think harder.'")
+            print("Thank you again for your help.")
+
+    elif npc_name == "ghost":
+        # Ghost blocks path until correct answer
+        if player["flags"].get("ghost_block", True):
+            answer = input("Ghost asks: What is the name of the king? ").strip().lower()
+            if answer == "Alfredus" or answer == "alfredus":
+                print("Ghost: You may pass.")
+                player["flags"]["ghost_block"] = False
+                room["enemy"] = None
+                player["current_enemy"] = None
+            else:
+                print("Ghost: That's not correct. You shall not pass.")
+        else:
+            print("The ghost has already let you pass.")
+
     else:
-        print(f"{npc_name.capitalize()}: {npc_dict[npc_name]}")
+        # Default dialogue
+        print(npc.get("dialogue", "They have nothing to say."))
+
 
 
 
@@ -418,6 +474,10 @@ def use_item(player, item_name):
         if player["hp"] > player["max_hp"]:
             player["hp"] = player["max_hp"]
         print(f"You use the {item_name} and restore {heal_amount} HP. Current HP: {player['hp']}/{player['max_hp']}")
+    elif item_type == "armor":
+        defense = item_data.get("defense", 0)
+        player["defense"] += defense
+        print(f"You equip the {item_name}. Defense increased by {defense}. Current defense: {player['defense']}")
 
         player["inventory"][item_name] -= 1
         if player["inventory"][item_name] == 0:
@@ -454,41 +514,57 @@ def start_encounter(player, rooms):
         else:
             print(f"There is a mysterious {enemy_name} here.")
 
-def attack_command(player, arg):
-    current_enemy = player.get("current_enemy")
-    if not current_enemy:
-        print("There is nothing to attack here.")
+def combat_loop(player):
+    enemy = player.get("current_enemy")
+    if not enemy:
+        print("There is nothing to fight here.")
         return
 
-    if not current_enemy.get("attackable", True):
-        print(f"The {current_enemy['name']} can't be attacked!")
+    if not enemy.get("attackable", True):
+        print(f"The {enemy['name']} can't be attacked!")
         return
 
-    damage = 10
-    current_enemy["hp"] -= damage
-    print(f"You attack the {current_enemy['name']} for {damage} damage.")
+    print(f"Combat started with {enemy['name']} (HP: {enemy['hp']})")
 
-    if current_enemy["hp"] <= 0:
-        print(f"The {current_enemy['name']} has been defeated!")
+    while enemy["hp"] > 0 and player["hp"] > 0:
+        print("\nYour turn! Choose an action:")
+        print("1. Attack")
+        print("2. Use Item")
+        action = input("Enter 1 or 2: ").strip()
 
-        if current_enemy["drops"] and random.random() < current_enemy["drop_chance"]:
-            drop = random.choice(current_enemy["drops"])
-            print(f"The {current_enemy['name']} dropped a {drop}!")
-            rooms[player["location"]]["items"].append(drop)
+        if action == "1":
+            damage = 10  
+            enemy["hp"] -= damage
+            print(f"You attack the {enemy['name']} for {damage} damage. Enemy HP: {max(enemy['hp'],0)}")
+
+            if enemy["hp"] <= 0:
+                print(f"The {enemy['name']} has been defeated!")
+                # drop
+                if enemy["drops"] and random.random() < enemy["drop_chance"]:
+                    drop = random.choice(enemy["drops"])
+                    print(f"The {enemy['name']} dropped a {drop}!")
+                    rooms[player["location"]]["items"].append(drop)
+                else:
+                    print(f"The {enemy['name']} dropped nothing.")
+                rooms[player["location"]]["enemy"] = None
+                player["current_enemy"] = None
+                return
+
+        elif action == "2":
+            item_name = input("Which item do you want to use? ").lower().strip()
+            use_item(player, item_name)
         else:
-            print(f"The {current_enemy['name']} dropped nothing.")
+            print("Invalid action, try again.")
+            continue
 
-        rooms[player["location"]]["enemy"] = None
-        player["current_enemy"] = None
-    else:
-        enemy_damage = current_enemy["damage"]
-        player["hp"] -= enemy_damage
-        print(f"The {current_enemy['name']} attacks you for {enemy_damage} damage!")
-        print(f"Your HP is now {player['hp']}/{player['max_hp']}.")
-
-        if player["hp"] <= 0:
-            print("You have been defeated. Game over.")
-            exit()
+        # Enemy turn 
+        if enemy["hp"] > 0:
+            enemy_damage = enemy["damage"]
+            player["hp"] -= enemy_damage
+            print(f"The {enemy['name']} attacks you for {enemy_damage} damage! Your HP: {max(player['hp'],0)}")
+            if player["hp"] <= 0:
+                print("You have been defeated. Game over.")
+                exit()
 
 commands = {
     "move": move_player,
@@ -503,9 +579,9 @@ commands = {
     "inventory": show_inventory,
     "inv": show_inventory,
     "use": use_item,
-    "attack": attack_command,
-    "fight": attack_command,
-    "kill": attack_command,
+        "attack": lambda p, a: combat_loop(p),
+    "fight": lambda p, a: combat_loop(p),
+    "kill": lambda p, a: combat_loop(p),
     "talk": talk_to_npc,
     
 }
