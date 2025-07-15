@@ -102,7 +102,7 @@ def load_map():
         },
         "2": {
             "description": "The Merchants Adobe! Buy anything you want.",
-            "exits": {"west": "0"},
+            "exits": {"west": "1"},
             "items": [],
             "enemy": None,
             "details":{
