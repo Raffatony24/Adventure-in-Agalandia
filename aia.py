@@ -1,6 +1,7 @@
 
 import random
 
+
 enemies = {
     "goblin": {
         "hp": 25,
@@ -70,7 +71,10 @@ def create_player():
         "level": 1,
         "inventory": {},
         "location": "0",
-        "current_enemy": None
+        "current_enemy": None,
+        "flags": {
+            "ghost_block": True
+}
     }
     return player
 
@@ -103,7 +107,9 @@ def load_map():
             "enemy": None,
             "details":{
                 "merchant": "A wandering merchant.",
-                
+            },
+            "npcs":{
+                "merchant":"interested in buying something?"
             }
         },
         "3": {
@@ -119,12 +125,16 @@ def load_map():
             }
         },
         "4": {
-            "description": "You are at the village and see a lot of villagers.",
+            "description": "You are at the village and see a villagers and a monk.",
             "exits": {"east": "3", "south": "5"},
             "items": [],
             "enemy": None,
             "details":{
                 "villagers": "They are talking and doing village stuff.",
+            },
+            "npcs":{
+                "villager":"hello there adventurer you look like you come from bertada is that rigth?",
+                "monk":"oh adventurer could you free us from the king alfredus?"
             }
         },
         "5": {
@@ -150,7 +160,7 @@ def load_map():
         },
         "7": {
             "description": "You have entered the cave and immediatly smell the smell of a rotting corpse ,see two paths. Which do you take?",
-            "exits": {"north": "8", "south": "9"},
+            "exits": {"north": "8", "south": "9","west": "6"},
             "items": ["dagger"],
             "enemy": "goblin",
             "details":{
@@ -170,7 +180,18 @@ def load_map():
             "exits": {"north": "7", "east": "10"},
             "items": [],
             "enemy": "ghost",
-            "details":{}
+            "details":{
+                "ghost":"the ghost is blocking your path maybe try talking to it"
+            },
+            "npcs":{
+                "ghost":"ill let you pass if you tell me the name of the king"
+            },
+            "blocked_exits":{
+                "east":{
+                    "condition":"ghost_block",
+                    "fail_text": "the ghost blocks your path it wont let you pass"
+                }
+            }
         },
         "10": {
             "description": "You see a skeleton wearing an armor and holding a key.",
@@ -190,6 +211,9 @@ def load_map():
             "details":{
                 "throne":"its a throne what did you expect",
                 "throne room":"exactly what the name suggests"
+            },
+            "npcs":{
+                "king":"what do you want"
             }
         }
     }
@@ -201,59 +225,37 @@ def examine_item(player, item_name):
         return
 
     item_name = item_name.lower()
-    room = rooms[player["location"]]
-    inventory_items = player["inventory"]
-    room_items = [i.lower() for i in room.get("items", [])]
-    room_details = room.get("details", {})
-    enemy_name = room.get("enemy")
-
-    # 1. guarda inventory
-    if item_name in inventory_items:
-        item_data = items.get(item_name)
-        if item_data and "description" in item_data:
-            print(f"{item_name.capitalize()}: {item_data['description']}")
-        else:
-            print(f"{item_name.capitalize()} has no description.")
-        return
-
-    # 2. guarda nei romm items se esiste
-    if item_name in room_items:
-        real_name = room["items"][room_items.index(item_name)]
-        item_data = items.get(real_name)
-        if item_data and "description" in item_data:
-            print(f"{real_name.capitalize()}: {item_data['description']}")
-        else:
-            print(f"{real_name.capitalize()} has no description.")
-        return
-
-    # 3. guarda i room detail
-    if item_name in room_details:
-        print(f"{item_name.capitalize()}: {room_details[item_name]}")
-        return
-
-    # 4. guarda gli enemy
-    if enemy_name and enemy_name.lower() == item_name:
-        enemy_data = enemies.get(enemy_name)
-        if enemy_data and "description" in enemy_data:
-            print(f"{enemy_name.capitalize()}: {enemy_data['description']}")
-        else:
-            print(f"{enemy_name.capitalize()} is here, but there's no description.")
-        return
-
-    # 5. Not found
-    print(f"You don't see a {item_name} here.")
-
     current_room = rooms[player["location"]]
-    room_items = [i.lower() for i in current_room["items"]]
-    if item_name in room_items:
+    room_items = [i.lower() for i in current_room.get("items", [])]
+    inventory_items = [i.lower() for i in player["inventory"].keys()]
+    details = current_room.get("details", {})
+
+    # Check inventory
+    if item_name in inventory_items:
+        real_item = list(player["inventory"].keys())[inventory_items.index(item_name)]
+        data = items.get(real_item)
+        if data:
+            print(f"{real_item.capitalize()}: {data.get('description', 'No description.')}")
+        return
+
+    # Check room items
+    elif item_name in room_items:
         real_item = current_room["items"][room_items.index(item_name)]
         data = items.get(real_item)
         if data:
             print(f"{real_item.capitalize()}: {data.get('description', 'No description.')}")
-        else:
-            print(f"{real_item.capitalize()} has no known description.")
+        return
+
+    # Check details
+    elif item_name in details:
+        print(f"{item_name.capitalize()}: {details[item_name]}")
+        return
+
     else:
         print(f"You don't see a {item_name} here.")
+
+
+
 
 def show_stats(player, arg=None):
     print("=== Player Stats ===")
@@ -304,7 +306,29 @@ def show_help(player, arg=None):
     print("inv/inventory       → Shows inventory")
     print("use    [object]     → Uses an object if it is in your inventory")
     print("fight/kill/attack <enemy> → Starts combat against specified enemy")
+    print("talk <npc name>      →talks to selected npc ")
     print("========================")
+
+def talk_to_npc(player, npc_name):
+    room = rooms[player["location"]]
+    npc_dict = room.get("npcs", {})
+
+    if npc_name not in npc_dict:
+        print(f"There is no {npc_name} here to talk to.")
+        return
+
+    if npc_name == "ghost":
+        print("Ghost: 'I'll let you pass if you tell me the name of the king.'")
+        answer = input("What is the name of the king? ").strip().lower()
+        if answer == "alfredus":  
+            print("Ghost: 'Correct. You may pass.'")
+            player["flags"]["ghost_block"] = False
+        else:
+            print("Ghost: 'Wrong. Think harder.'")
+    else:
+        print(f"{npc_name.capitalize()}: {npc_dict[npc_name]}")
+
+
 
 def move_player(player, direction):
     if not direction:
@@ -313,6 +337,14 @@ def move_player(player, direction):
 
     current_room = rooms[player["location"]]
     if direction in current_room["exits"]:
+        # Check for blocked path
+        blocked = current_room.get("blocked_exits", {}).get(direction)
+        if blocked:
+            condition = blocked["condition"]
+            if player["flags"].get(condition, True):  # Still blocked
+                print(blocked["fail_text"])
+                return
+
         new_location = current_room["exits"][direction]
         target_room = rooms[new_location]
 
@@ -473,7 +505,9 @@ commands = {
     "use": use_item,
     "attack": attack_command,
     "fight": attack_command,
-    "kill": attack_command
+    "kill": attack_command,
+    "talk": talk_to_npc,
+    
 }
 
 def show_menu():
