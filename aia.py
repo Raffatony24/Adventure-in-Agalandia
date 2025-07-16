@@ -258,7 +258,7 @@ def load_map():
             }
         },
         "10": {
-            "description": "You see a skeleton wearing an armor  a pendant and a key.",
+            "description": "You see a skeleton wearing an armor a pendant and a key , you also think you can take a bone from it.",
             "exits": {"west": "9", "east": "11"},
             "items": ["key", "pendant", "bone"],
             "enemy": None,
