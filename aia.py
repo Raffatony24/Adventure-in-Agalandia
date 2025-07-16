@@ -27,14 +27,33 @@ enemies = {
         "damage": 0,
         "description": "an immaterial ghost that cant be touched",
         "attackable": False
-    }
+    },
+    "necromancer": {
+        "hp": 100,
+        "damage": 12,
+        "description": "A dark mage who commands the dead.",
+        "special_ability": {
+            "name": "Soul Drain",
+            "trigger_chance": 0.3,
+            "effect": "drains 20 HP from you and heals himself"
+        },
+    "use_items": {
+        "healing potion": {
+            "heal_amount": 30,
+            "uses": 1
+        }
+    },
+    "drop_chance": 1.0,
+    "drops": ["necromancer staff"]
+}
+
 }
 
 items = {
     "sword": {
         "description": "an old rusty blade.",
         "type": "weapon",
-        "damage": 10
+        "damage": 7
     },
     "key": {
         "description": "A big key maybe it opens something.",
@@ -53,7 +72,7 @@ items = {
     "dagger": {
         "description": "A small, quick blade.",
         "type": "weapon",
-        "damage": 5
+        "damage": 6
     },
     "health potion": {
         "description": "Restores 50 HP when used.",
@@ -68,8 +87,27 @@ items = {
     "pendant":{
         "description":"an old shiny pendant",
         "type":"quest"
+    },
+    "necromancer staff": {
+        "description": "A dark staff that drains life from enemies.",
+        "type": "weapon",
+        "damage": 5,
+        "effect": "soul_drain"
+    },
+    "better sword":{
+        "description":"a great sword",
+        "type":"weapon",
+        "damage":8
+    },
+    "bone":{
+        "description":"a bone",
+        "type":"quest"
+
     }
 }
+
+
+
 
 def create_player():
     player = {
@@ -81,10 +119,8 @@ def create_player():
         "inventory": {},
         "location": "0",
         "current_enemy": None,
-        "defense": 0,
-        "flags": {
-            "ghost_block": True
-        },
+        "flags": {"ghost_block": True},
+        "gold": 0,  
         "quests": {}
     }
     return player
@@ -120,12 +156,18 @@ def load_map():
             "npcs":{
                 "merchant":{
                     "dialogue":"interested in buying something?"
-            }
-        }
+            },
+            },
+            "merchant_inventory" : {
+                "health potion": 25,
+                "better sword": 50
+            },
+            
+            
         },
         "3": {
-            "description": "You can see a cave entrance to your east and the lights of the village to your west.",
-            "exits": {"east": "6", "west": "4"},
+            "description": "your path diverges in 3 , village to the east , cave to the east and a cimitary to the north.(hint:go there once strong enough)",
+            "exits": {"east": "6", "west": "4","north": "12","south":"1"},
             "items": [],
             "enemy": None,
             "details":{
@@ -148,7 +190,7 @@ def load_map():
                     "dialogue":"hello there adventurer you look like you come from bertada is that rigth?"
                 },
                 "monk":{
-                    "dialogue":"oh adventurer could you free us from the king alfredus?"
+                    "dialogue":"if you give me some bones ill give you gold"
                 },
                 "mage":{
                     "dialogue":"i can give you a magic robe if you give me the pendant",
@@ -218,10 +260,10 @@ def load_map():
         "10": {
             "description": "You see a skeleton wearing an armor  a pendant and a key.",
             "exits": {"west": "9", "east": "11"},
-            "items": ["key", "pendant"],
+            "items": ["key", "pendant", "bone"],
             "enemy": None,
             "details":{
-                "skeleton":"this must have been the reason for the smell",
+                "skeleton":"this must have been the reason for the smell , you also think you could grab a bone",
                 "armor":"the armor is too fragile to use , maybe use the shield?"
             }
         },
@@ -239,10 +281,64 @@ def load_map():
                     "dialogue":"what do you want"
             }
         }
-    }
+    },
+        "12":{
+            "description":"you are in a cimitary , it reeks like death here",
+            "exits":{"south":"3"},
+            "items":[],
+            "enemy":"necromancer"
+        }
     }
     
     return rooms
+
+def buy_item(player, item_name):
+    location = player["location"]
+    room = rooms[location]
+
+    if "merchant_inventory" not in room:
+        print("There is no merchant here to buy from.")
+        return
+
+    merchant_inventory = room["merchant_inventory"]
+
+    if not item_name:
+        print("Buy what?")
+        return
+
+    item_name = item_name.lower()
+
+    if item_name not in merchant_inventory:
+        print(f"The merchant does not have {item_name} for sale.")
+        return
+
+    price = merchant_inventory[item_name]
+
+    if player.get("gold", 0) < price:
+        print(f"You don't have enough gold to buy {item_name}. It costs {price} gold.")
+        return
+
+   
+    player["gold"] -= price
+    player["inventory"][item_name] = player["inventory"].get(item_name, 0) + 1
+
+    print(f"You bought a {item_name} for {price} gold.")
+
+
+
+def show_merchant_inventory(player, arg=None):
+    location = player["location"]
+    room = rooms[location]
+
+    if "merchant_inventory" not in room:
+        print("There is no merchant here.")
+        return
+
+    merchant_inventory = room["merchant_inventory"]
+
+    print("The merchant sells:")
+    for item, price in merchant_inventory.items():
+        print(f"  {item.capitalize()} - {price} gold")
 
 def examine_item(player, item_name):
     if not item_name:
@@ -255,7 +351,7 @@ def examine_item(player, item_name):
     inventory_items = [i.lower() for i in player["inventory"].keys()]
     details = current_room.get("details", {})
 
-    # Check inventory
+    
     if item_name in inventory_items:
         real_item = list(player["inventory"].keys())[inventory_items.index(item_name)]
         data = items.get(real_item)
@@ -263,7 +359,7 @@ def examine_item(player, item_name):
             print(f"{real_item.capitalize()}: {data.get('description', 'No description.')}")
         return
 
-    # Check room items
+    
     elif item_name in room_items:
         real_item = current_room["items"][room_items.index(item_name)]
         data = items.get(real_item)
@@ -271,7 +367,7 @@ def examine_item(player, item_name):
             print(f"{real_item.capitalize()}: {data.get('description', 'No description.')}")
         return
 
-    # Check details
+    
     elif item_name in details:
         print(f"{item_name.capitalize()}: {details[item_name]}")
         return
@@ -288,6 +384,7 @@ def show_stats(player, arg=None):
     print(f"HP: {player['hp']} / {player['max_hp']}")
     print(f"Level: {player['level']}")
     print(f"XP: {player['xp']}")
+    print(f"Gold: {player['gold']}")
     print(f"Location: {player['location']}")
     print("Inventory:")
     if player['inventory']:
@@ -300,6 +397,113 @@ def show_stats(player, arg=None):
 def quit_game(player, arg=None):
     print(f"Goodbye, {player['name']}")
     exit()
+
+def turn_based_combat(player):
+    enemy = player["current_enemy"]
+    if not enemy:
+        return
+
+    enemy_data = enemies.get(enemy["name"], {})
+
+    while player["hp"] > 0 and enemy["hp"] > 0:
+        print(f"\nYour HP: {player['hp']}/{player['max_hp']}")
+        print(f"{enemy['name'].capitalize()} HP: {enemy['hp']}")
+
+        raw_action = input("Do you want to [attack] or [use <item>]? ").strip().lower()
+        parts = raw_action.split(maxsplit=1)
+        action = parts[0]
+        item_arg = parts[1] if len(parts) > 1 else ""
+
+        if action == "attack":
+            weapon_name = player.get("equipped_weapon")
+            weapon = items.get(weapon_name, {}) if weapon_name else {}
+            base_damage = weapon.get("damage", 5)
+
+            enemy["hp"] -= base_damage
+            print(f"You attack the {enemy['name']} for {base_damage} damage.")
+
+            if weapon.get("effect") == "soul_drain":
+                drain_amount = 5
+                player["hp"] = min(player["hp"] + drain_amount, player["max_hp"])
+                print(f"The {weapon_name} drains {drain_amount} HP and heals you.")
+
+        elif action == "use":
+            if not item_arg:
+                item_arg = input("Which item? ").strip().lower()
+
+            if item_arg in player["inventory"]:
+                use_item(player, item_arg)
+            else:
+                print(f"You don't have a {item_arg}.")
+                continue
+        else:
+            print("Invalid action.")
+            continue
+
+        if enemy["hp"] <= 0:
+            print(f"You defeated the {enemy['name']}!")
+
+            if enemy.get("drops") and random.random() < enemy.get("drop_chance", 0):
+                drop = random.choice(enemy["drops"])
+                print(f"The {enemy['name']} dropped a {drop}!")
+                rooms[player["location"]]["items"].append(drop)
+
+            rooms[player["location"]]["enemy"] = None
+            player["current_enemy"] = None
+            break
+
+        enemy_damage = enemy.get("damage", 0)
+        player["hp"] -= enemy_damage
+        print(f"The {enemy['name']} attacks you for {enemy_damage} damage!")
+        print(f"Your HP is now {player['hp']}/{player['max_hp']}.")
+
+        if player["hp"] <= 0:
+            print("You were defeated. Game over.")
+            exit()
+
+        
+        if "use_items" in enemy_data:
+            for item, data in list(enemy_data["use_items"].items()):
+                if enemy["hp"] <= 30 and data["uses"] > 0:
+                    heal = data["heal_amount"]
+                    enemy["hp"] += heal
+                    data["uses"] -= 1
+                    print(f"The {enemy['name']} uses a {item} and heals {heal} HP!")
+                    continue
+
+        
+        if "special_ability" in enemy_data:
+            special = enemy_data["special_ability"]
+            if random.random() < special.get("trigger_chance", 0):
+                print(f"The {enemy['name']} uses {special['name']}! {special['effect']}")
+                
+                player["hp"] -= 20
+                enemy["hp"] += 20
+                if enemy["hp"] > enemy_data["hp"]:
+                    enemy["hp"] = enemy_data["hp"]
+
+        
+        else:
+            dmg = enemy["damage"]
+            player["hp"] -= dmg
+            print(f"The {enemy['name']} attacks you for {dmg} damage!")
+
+        if player["hp"] <= 0:
+            print("You have been defeated. Game over.")
+            exit()
+
+
+def equip_item(player, item_name):
+    if item_name not in player["inventory"]:
+        print(f"You don't have a {item_name}.")
+        return
+
+    item = items.get(item_name)
+    if item and item.get("type") == "weapon":
+        player["equipped_weapon"] = item_name
+        print(f"You equipped the {item_name}.")
+    else:
+        print(f"You can't equip the {item_name}.")
 
 def look_around(player, rooms):
     location = player["location"]
@@ -332,6 +536,9 @@ def show_help(player, arg=None):
     print("use    [object]     → Uses an object if it is in your inventory")
     print("fight/kill/attack <enemy> → Starts combat against specified enemy")
     print("talk <npc name>      →talks to selected npc ")
+    print("equip <item>        →preferred to use this instead of use item for weapons")
+    print("buy   <item>        → buys item if enough money ")
+    print("shop <item> → shows what the merchant sells")
     print("========================")
 
 def talk_to_npc(player, npc_name):
@@ -345,7 +552,7 @@ def talk_to_npc(player, npc_name):
     npc = room["npcs"][npc_name]
 
     if npc_name == "mage":
-        # Quest status for magic robe
+        
         quest_status = player["quests"].get("magic_robe", None)
 
         if quest_status is None:
@@ -356,7 +563,7 @@ def talk_to_npc(player, npc_name):
                 print("Thank you for bringing the pendant! Here, take this magic robe.")
                 player["inventory"]["magic robe"] = player["inventory"].get("magic robe", 0) + 1
                 player["quests"]["magic_robe"] = "completed"
-                # Remove pendant from inventory
+                
                 player["inventory"]["pendant"] -= 1
                 if player["inventory"]["pendant"] == 0:
                     del player["inventory"]["pendant"]
@@ -366,10 +573,10 @@ def talk_to_npc(player, npc_name):
             print("Thank you again for your help.")
 
     elif npc_name == "ghost":
-        # Ghost blocks path until correct answer
+        
         if player["flags"].get("ghost_block", True):
             answer = input("Ghost asks: What is the name of the king? ").strip().lower()
-            if answer == "Alfredus" or answer == "alfredus":
+            if answer == "alfredus":
                 print("Ghost: You may pass.")
                 player["flags"]["ghost_block"] = False
                 room["enemy"] = None
@@ -379,9 +586,29 @@ def talk_to_npc(player, npc_name):
         else:
             print("The ghost has already let you pass.")
 
+    elif npc_name == "monk":
+        quest_status = player["quests"].get("monk_quest", None)
+
+        if quest_status is None:
+            print(npc.get("dialogue", "I have a favor to ask."))
+            player["quests"]["monk_quest"] = "pending"
+
+        elif quest_status == "pending":
+            
+            if "bone" in player["inventory"]:
+                print("Thank you for completing my favor. Here is 50 gold as promised.")
+                player["gold"] = player.get("gold", 0) + 50
+                player["quests"]["monk_quest"] = "completed"
+            else:
+                print("Please bring me the bone to complete the quest.")
+
+        else:  
+            print("Thanks again for your help.")
+
     else:
-        # Default dialogue
+        
         print(npc.get("dialogue", "They have nothing to say."))
+
 
 
 
@@ -393,11 +620,11 @@ def move_player(player, direction):
 
     current_room = rooms[player["location"]]
     if direction in current_room["exits"]:
-        # Check for blocked path
+        
         blocked = current_room.get("blocked_exits", {}).get(direction)
         if blocked:
             condition = blocked["condition"]
-            if player["flags"].get(condition, True):  # Still blocked
+            if player["flags"].get(condition, True):  
                 print(blocked["fail_text"])
                 return
 
@@ -478,6 +705,9 @@ def use_item(player, item_name):
         defense = item_data.get("defense", 0)
         player["defense"] += defense
         print(f"You equip the {item_name}. Defense increased by {defense}. Current defense: {player['defense']}")
+    elif item_type == "weapon":
+        player["equipped_weapon"] = item_name
+        print(f"You equipped the {item_name}.")
 
         player["inventory"][item_name] -= 1
         if player["inventory"][item_name] == 0:
@@ -499,20 +729,25 @@ def start_encounter(player, rooms):
     location = player["location"]
     room = rooms[location]
     enemy_name = room.get("enemy")
+
     if enemy_name and player.get("current_enemy") is None:
         enemy_data = enemies.get(enemy_name)
         if enemy_data:
+            if not enemy_data.get("attackable", True):
+                print(f"There is a {enemy_name} here. {enemy_data.get('description', '')}")
+                return
+
             player["current_enemy"] = {
                 "name": enemy_name,
                 "hp": enemy_data["hp"],
                 "damage": enemy_data["damage"],
-                "attackable": enemy_data.get("attackable", True),
+                "attackable": True,
                 "drops": enemy_data.get("drops", []),
                 "drop_chance": enemy_data.get("drop_chance", 0)
             }
-            print(f"A wild {enemy_name} appears! {enemy_data['description']}")
-        else:
-            print(f"There is a mysterious {enemy_name} here.")
+
+            print(f"{enemy_name} appears! {enemy_data['description']}")
+            turn_based_combat(player)  # <- Starts combat immediately
 
 def combat_loop(player):
     enemy = player.get("current_enemy")
@@ -579,10 +814,13 @@ commands = {
     "inventory": show_inventory,
     "inv": show_inventory,
     "use": use_item,
-        "attack": lambda p, a: combat_loop(p),
+    "attack": lambda p, a: combat_loop(p),
     "fight": lambda p, a: combat_loop(p),
     "kill": lambda p, a: combat_loop(p),
     "talk": talk_to_npc,
+    "equip": equip_item,
+    "buy": buy_item,
+    "shop":show_merchant_inventory,
     
 }
 
